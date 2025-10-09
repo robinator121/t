@@ -16,5 +16,5 @@
 ```bash
 # compile tool (requires C++17)
 g++ -std=c++17 t.cpp -o t
-# move to /usr/local/bin or use locally
-mv t /usr/local/bin/
+sudo mkdir -p /usr/share/t
+sudo mv templates /usr/share/t
