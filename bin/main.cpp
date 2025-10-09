@@ -99,7 +99,7 @@ protected:
         if (FILE *file = fopen(filename.c_str(), "r"))
         {
             fclose(file);
-            cout << "File " << filename << " already exists. Using existing source.\n";
+            cout << "File " << filename << " already exists. Using existing source." << endl;
             return; // skip template copying
         }
 
@@ -130,8 +130,8 @@ public:
 
     void compile() override
     {
-        if (!comp) { cout << "Compile flag disabled for java; skipping compile.\n"; return; }
-        cout << "Compiling " << filename << " with javac...\n";
+        if (!comp) { cout << "Compile flag disabled for java; skipping compile." << endl; return; }
+        cout << "Compiling " << filename << " with javac..." << endl;
         int status = system(("javac " + filename).c_str());
         decode_system_status(status, "javac");
     }
@@ -143,7 +143,7 @@ public:
         string cls = filename;
         if (cls.size() > 5 && cls.substr(cls.size() - 5) == ".java")
             cls = cls.substr(0, cls.size() - 5);
-        cout << "Running java " << cls << "...\n";
+        cout << "Running java " << cls << "..." << endl;
         int status = system(("java " + cls).c_str());
         decode_system_status(status, "java");
     }
@@ -175,8 +175,8 @@ public:
 
     void compile() override
     {
-        if (!comp) { cout << "Compile flag disabled for c; skipping compile.\n"; return; }
-        cout << "Compiling " << filename << " with gcc -o " << outname << "...\n";
+        if (!comp) { cout << "Compile flag disabled for c; skipping compile." << endl; return; }
+        cout << "Compiling " << filename << " with gcc -o " << outname << "..." << endl;
         string cmd = "gcc " + filename + " -o " + outname + " 2>&1";
         int status = system(cmd.c_str());
         decode_system_status(status, "gcc");
@@ -185,7 +185,7 @@ public:
     void run() override
     {
         if (!r) return;
-        cout << "Running " << outname << "...\n";
+        cout << "Running " << outname << "..." << endl;
         int status = system(("./" + outname).c_str());
         decode_system_status(status, outname);
     }
@@ -217,8 +217,8 @@ public:
 
     void compile() override
     {
-        if (!comp) { cout << "Compile flag disabled for cpp; skipping compile.\n"; return; }
-        cout << "Compiling " << filename << " with g++ -o " << outname << "...\n";
+        if (!comp) { cout << "Compile flag disabled for cpp; skipping compile." << endl; return; }
+        cout << "Compiling " << filename << " with g++ -o " << outname << "..." << endl;
         string cmd = "g++ " + filename + " -o " + outname + " 2>&1";
         int status = system(cmd.c_str());
         decode_system_status(status, "g++");
@@ -227,7 +227,7 @@ public:
     void run() override
     {
         if (!r) return;
-        cout << "Running " << outname << "...\n";
+        cout << "Running " << outname << "..." << endl;
         int status = system(("./" + outname).c_str());
         decode_system_status(status, outname);
     }
@@ -243,15 +243,186 @@ public:
 
     void compile() override
     {
-        cout << "Python is interpreted: compile ignored.\n";
+        cout << "Python is interpreted: compile ignored." << endl;
     }
 
     void run() override
     {
         if (!r) return;
-        cout << "Running " << filename << " with python3...\n";
+        cout << "Running " << filename << " with python3..." << endl;
         int status = system(("python3 " + filename).c_str());
         decode_system_status(status, "python3");
+    }
+};
+
+// === New language classes: rust, asm_lang, fortran, dlang, rlang ===
+
+class rust : public language {
+    string outname;
+public:
+    rust(bool runFlag, bool compileFlag, short tnum, string fname, string out)
+    : language(runFlag, compileFlag, tnum, fname, "rust"), outname(out) {}
+
+    rust(bool runFlag, bool compileFlag, short tnum, string fname)
+    : language(runFlag, compileFlag, tnum, fname, "rust") {
+        outname = strip_extension(fname);
+        if (outname.empty()) outname = "a.out";
+    }
+
+    rust(bool runFlag, bool compileFlag, string fname, string out)
+    : language(runFlag, compileFlag, fname, "rust"), outname(out) {}
+
+    rust(bool runFlag, bool compileFlag, string fname)
+    : language(runFlag, compileFlag, fname, "rust") {
+        outname = strip_extension(fname);
+        if (outname.empty()) outname = "a.out";
+    }
+
+    void compile() override {
+        if (!comp) { cout << "Compile flag disabled for rust; skipping." << endl; return; }
+        cout << "Compiling " << filename << " with rustc -o " << outname << "..." << endl;
+        int status = system(("rustc " + filename + " -o " + outname).c_str());
+        decode_system_status(status, "rustc");
+    }
+
+    void run() override {
+        if (!r) return;
+        cout << "Running " << outname << "..." << endl;
+        int status = system(("./" + outname).c_str());
+        decode_system_status(status, outname);
+    }
+};
+
+class asm_lang : public language {
+    string outname;
+public:
+    asm_lang(bool runFlag, bool compileFlag, short tnum, string fname, string out)
+    : language(runFlag, compileFlag, tnum, fname, "asm"), outname(out) {}
+
+    asm_lang(bool runFlag, bool compileFlag, short tnum, string fname)
+    : language(runFlag, compileFlag, tnum, fname, "asm") {
+        outname = strip_extension(fname);
+        if (outname.empty()) outname = "a.out";
+    }
+
+    asm_lang(bool runFlag, bool compileFlag, string fname, string out)
+    : language(runFlag, compileFlag, fname, "asm"), outname(out) {}
+
+    asm_lang(bool runFlag, bool compileFlag, string fname)
+    : language(runFlag, compileFlag, fname, "asm") {
+        outname = strip_extension(fname);
+        if (outname.empty()) outname = "a.out";
+    }
+
+    void compile() override {
+        if (!comp) { cout << "Compile flag disabled for asm; skipping." << endl; return; }
+        cout << "Assembling " << filename << " with nasm (elf64) and linking..." << endl;
+        string obj = outname + ".o";
+        int status = system((string("nasm -f elf64 ") + filename + " -o " + obj).c_str());
+        decode_system_status(status, "nasm");
+        if (status == 0) {
+            status = system((string("ld ") + obj + " -o " + outname).c_str());
+            decode_system_status(status, "ld");
+        }
+    }
+
+    void run() override {
+        if (!r) return;
+        cout << "Running " << outname << "..." << endl;
+        int status = system(("./" + outname).c_str());
+        decode_system_status(status, outname);
+    }
+};
+
+class fortran : public language {
+    string outname;
+public:
+    fortran(bool runFlag, bool compileFlag, short tnum, string fname, string out)
+        : language(runFlag, compileFlag, tnum, fname, "fortran"), outname(out) {}
+
+        fortran(bool runFlag, bool compileFlag, short tnum, string fname)
+            : language(runFlag, compileFlag, tnum, fname, "fortran") {
+                outname = strip_extension(fname);
+                if (outname.empty()) outname = "a.out";
+            }
+
+            fortran(bool runFlag, bool compileFlag, string fname, string out)
+                : language(runFlag, compileFlag, fname, "fortran"), outname(out) {}
+
+                fortran(bool runFlag, bool compileFlag, string fname)
+                    : language(runFlag, compileFlag, fname, "fortran") {
+                        outname = strip_extension(fname);
+                        if (outname.empty()) outname = "a.out";
+                    }
+
+                    void compile() override {
+                        if (!comp) { cout << "Compile flag disabled for fortran; skipping." << endl; return; }
+                        cout << "Compiling " << filename << " with gfortran -o " << outname << "..." << endl;
+                        int status = system(("gfortran " + filename + " -o " + outname).c_str());
+                        decode_system_status(status, "gfortran");
+                    }
+
+                    void run() override {
+                        if (!r) return;
+                        cout << "Running " << outname << "..." << endl;
+                        int status = system(("./" + outname).c_str());
+                        decode_system_status(status, outname);
+                    }
+};
+
+class dlang : public language {
+    string outname;
+public:
+    dlang(bool runFlag, bool compileFlag, short tnum, string fname, string out)
+    : language(runFlag, compileFlag, tnum, fname, "d"), outname(out) {}
+
+    dlang(bool runFlag, bool compileFlag, short tnum, string fname)
+    : language(runFlag, compileFlag, tnum, fname, "d") {
+        outname = strip_extension(fname);
+        if (outname.empty()) outname = "a.out";
+    }
+
+    dlang(bool runFlag, bool compileFlag, string fname, string out)
+    : language(runFlag, compileFlag, fname, "d"), outname(out) {}
+
+    dlang(bool runFlag, bool compileFlag, string fname)
+    : language(runFlag, compileFlag, fname, "d") {
+        outname = strip_extension(fname);
+        if (outname.empty()) outname = "a.out";
+    }
+
+    void compile() override {
+        if (!comp) { cout << "Compile flag disabled for D; skipping." << endl; return; }
+        cout << "Compiling " << filename << " with dmd -of" << outname << "..." << endl;
+        int status = system(("dmd " + filename + " -of" + outname).c_str());
+        decode_system_status(status, "dmd");
+    }
+
+    void run() override {
+        if (!r) return;
+        cout << "Running " << outname << "..." << endl;
+        int status = system(("./" + outname).c_str());
+        decode_system_status(status, outname);
+    }
+};
+
+class rlang : public language {
+public:
+    rlang(bool runFlag, bool compileFlagIgnored, short tnum, string fname)
+    : language(runFlag, false, tnum, fname, "r") {}
+
+    rlang(bool runFlag, bool compileFlagIgnored, string fname)
+    : language(runFlag, false, fname, "r") {}
+
+    void compile() override {
+        cout << "R is interpreted: compile ignored." << endl;
+    }
+
+    void run() override {
+        if (!r) return;
+        cout << "Running " << filename << " with Rscript..." << endl;
+        int status = system(("Rscript " + filename).c_str());
+        decode_system_status(status, "Rscript");
     }
 };
 
@@ -260,7 +431,7 @@ public:
 void print_usage()
 {
     cout << "Usage: t [language] [options]\n"
-    << "Languages: C, C++, Java, Python\n"
+    << "Languages: C, C++, Java, Python, Rust, ASM, Fortran, D, R\n"
     << "Options:\n"
     << "  -f, --file <name>       generated source filename (default main.c / Main.java / main.cpp / script.py)\n"
     << "  -o, --output <name>     output binary name for C/C++ (default: filename without extension)\n"
@@ -275,7 +446,7 @@ void print_usage()
 
 int main(int argc, char* argv[])
 {
-    string supp_lang[4] = {"C","C++","JAVA","PYTHON"};
+    string supp_lang[9] = {"C","C++","JAVA","PYTHON","RUST","ASM","FORTRAN","D","R"};
 
     if (argc == 1)
     {
@@ -289,7 +460,7 @@ int main(int argc, char* argv[])
     if (U == "-H" || U == "--HELP") { print_usage(); return 0; }
     if (U == "-S" || U == "--SUPPORTED") {
         cout << "Supported languages:\n";
-        for (int i=0;i<4;i++) cout << "  " << supp_lang[i] << "\n";
+        for (int i=0;i<9;i++) cout << "  " << supp_lang[i] << "\n";
         return 0;
     }
     if (U == "-V" || U == "--VERSION") {
@@ -347,6 +518,11 @@ int main(int argc, char* argv[])
     else if (U == "CPP" || U == "C++") default_fname = "main.cpp";
     else if (U == "JAVA") default_fname = "Main.java";
     else if (U == "PYTHON" || U == "PY") default_fname = "script.py";
+    else if (U == "RUST") default_fname = "main.rs";
+    else if (U == "ASM" || U == "ASSEMBLY") default_fname = "main.asm";
+    else if (U == "FORTRAN") default_fname = "main.f90";
+    else if (U == "D" || U == "DLANG") default_fname = "main.d";
+    else if (U == "R") default_fname = "script.R";
     else { cerr << "Unsupported language: " << first << "\n"; return 1; }
 
     string chosen_fname = filename_override.empty() ? default_fname : filename_override;
@@ -356,13 +532,13 @@ int main(int argc, char* argv[])
     if (FILE *f = fopen(chosen_fname.c_str(), "r")) { fclose(f); file_exists = true; }
 
     if (file_exists && !compileFlag && !runFlag) {
-        if (U == "C" || U == "CPP" || U == "C++" || U == "JAVA") {
+        if (U == "C" || U == "CPP" || U == "C++" || U == "JAVA" || U == "RUST" || U == "ASM" || U == "FORTRAN" || U == "D" || U == "DLANG") {
             compileFlag = true;
             runFlag = true;
-            cout << "Detected existing source. Auto-enabling compile + run.\n";
-        } else if (U == "PYTHON" || U == "PY") {
+            cout << "Detected existing source. Auto-enabling compile + run." << endl;
+        } else if (U == "PYTHON" || U == "PY" || U == "R") {
             runFlag = true;
-            cout << "Detected existing script. Auto-enabling run.\n";
+            cout << "Detected existing script. Auto-enabling run." << endl;
         }
     }
 
@@ -398,8 +574,48 @@ int main(int argc, char* argv[])
         if (tnum_specified) prog = new python(runFlag, compileFlag, tnum, chosen_fname);
         else prog = new python(runFlag, compileFlag, chosen_fname);
     }
+    else if (U == "RUST") {
+        if (!out_override.empty()) {
+            if (tnum_specified) prog = new rust(runFlag, compileFlag, tnum, chosen_fname, out_override);
+            else prog = new rust(runFlag, compileFlag, chosen_fname, out_override);
+        } else {
+            if (tnum_specified) prog = new rust(runFlag, compileFlag, tnum, chosen_fname);
+            else prog = new rust(runFlag, compileFlag, chosen_fname);
+        }
+    }
+    else if (U == "ASM" || U == "ASSEMBLY") {
+        if (!out_override.empty()) {
+            if (tnum_specified) prog = new asm_lang(runFlag, compileFlag, tnum, chosen_fname, out_override);
+            else prog = new asm_lang(runFlag, compileFlag, chosen_fname, out_override);
+        } else {
+            if (tnum_specified) prog = new asm_lang(runFlag, compileFlag, tnum, chosen_fname);
+            else prog = new asm_lang(runFlag, compileFlag, chosen_fname);
+        }
+    }
+    else if (U == "FORTRAN") {
+        if (!out_override.empty()) {
+            if (tnum_specified) prog = new fortran(runFlag, compileFlag, tnum, chosen_fname, out_override);
+            else prog = new fortran(runFlag, compileFlag, chosen_fname, out_override);
+        } else {
+            if (tnum_specified) prog = new fortran(runFlag, compileFlag, tnum, chosen_fname);
+            else prog = new fortran(runFlag, compileFlag, chosen_fname);
+        }
+    }
+    else if (U == "D" || U == "DLANG") {
+        if (!out_override.empty()) {
+            if (tnum_specified) prog = new dlang(runFlag, compileFlag, tnum, chosen_fname, out_override);
+            else prog = new dlang(runFlag, compileFlag, chosen_fname, out_override);
+        } else {
+            if (tnum_specified) prog = new dlang(runFlag, compileFlag, tnum, chosen_fname);
+            else prog = new dlang(runFlag, compileFlag, chosen_fname);
+        }
+    }
+    else if (U == "R") {
+        if (tnum_specified) prog = new rlang(runFlag, compileFlag, tnum, chosen_fname);
+        else prog = new rlang(runFlag, compileFlag, chosen_fname);
+    }
 
-    if (!prog) { cerr << "Failed to create language object\n"; return 1; }
+    if (!prog) { cerr << "Failed to create language object" << endl; return 1; }
 
     prog->compile();
     prog->run();
