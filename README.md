@@ -5,7 +5,7 @@
 ## Key features
 - Generate starter files from templates (per-language template folders).
 - If source already exists, `t` can **auto-compile + run** sensible defaults.
-- Support for C, C++, Java and Python (easy to add more).
+- Support for C, C++, Java, Python, R, D, Fortran, ASM
 - Per-language compile/run behavior via inheritance (compile ignored for interpreted languages).
 - Specify source filename and compiled binary name (`-f`, `-o`).
 - Choose a particular template (by number) or use defaults.
