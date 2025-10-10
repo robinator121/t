@@ -1,0 +1,18 @@
+#include <stdio.h>
+#include <stdlib.h>
+
+int main()
+{
+    FILE* ptr;
+
+    ptr = fopen("./Example", "w");
+
+    if (ptr == NULL) {
+        printf("Error Occurred While creating a file !");
+        exit(1);
+    }
+    fclose(ptr);
+    printf("File created\n\n");
+
+    return 0;
+}
