@@ -6,6 +6,9 @@
 #include <cstdlib>
 #include <string>
 #include <sys/wait.h>
+#include <vector>
+#include <unistd.h>
+#include <sys/stat.h>
 using namespace std;
 
 
@@ -36,7 +39,7 @@ int decode_system_status(int status, const string &label)
     } else if (WIFSIGNALED(status)) {
         int sig = WTERMSIG(status);
         cout << label << " terminated by signal: " << sig << "\n";
-        return 128 + sig; // common convention
+        return 128 + sig; // common convention for some reason
     } else {
         cout << label << " finished with status: " << status << "\n";
         return status;
@@ -255,8 +258,6 @@ public:
     }
 };
 
-// === New language classes: rust, asm_lang, fortran, dlang, rlang ===
-
 class rust : public language {
     string outname;
 public:
@@ -425,8 +426,46 @@ public:
         decode_system_status(status, "Rscript");
     }
 };
+//R UNNER DESCRIPTIONS
+void show_runner_versions() {
+    cout << "=== Compiler/Interpreter Versions ===\n";
+    // Java
+    cout << "\n[java --version]\n";
+    system("java --version");
 
-/* ---------- usage/help ---------- */
+    // Python
+    cout << "\n[python3 --version]\n";
+    system("python3 --version");
+
+    // GCC
+    cout << "\n[gcc --version]\n";
+    system("gcc --version");
+
+    // G++
+    cout << "\n[g++ --version]\n";
+    system("g++ --version");
+
+    // Rust
+    cout << "\n[rustc --version]\n";
+    system("rustc --version");
+
+    // Fortran
+    cout << "\n[gfortran --version]\n";
+    system("gfortran --version");
+
+    // D
+    cout << "\n[dmd --version]\n";
+    system("dmd --version");
+
+    // Assembly (nasm)
+    cout << "\n[nasm --version]\n";
+    system("nasm --version");
+
+    // R
+    cout << "\n[Rscript --version]\n";
+    system("Rscript --version");
+    cout << "=== End of Versions ===\n";
+}
 
 void print_usage()
 {
@@ -438,10 +477,123 @@ void print_usage()
     << "  -c, --compile           enable compilation\n"
     << "  -r, --run               run after compile (implies -c)\n"
     << "  -t N, --template N      use template number N (templateN)\n"
+    << "  -b, --bug               run bug/robustness tests (argument, random, stress, valgrind)\n" // NEW
     << "  -s, --supported         list supported languages\n"
     << "  -h, --help              show this help\n"
-    << "  -v, --version           show version\n";
+    << "  -v, --version           show version\n"
+    << "  -rv                     display versions of installed compilers/interpreters\n" // NEW
+    << "  -x  --cleanup           cleans up the executable files after running them\n"; //NEW
 }
+// Helper: check if file exists
+bool file_exists(const string &fname)
+{
+    struct stat buffer;
+    return stat(fname.c_str(), &buffer) == 0;
+}
+
+// Helper: run a system command and return exit code, printing status
+int run_and_report(const string &cmd, const string &label)
+{
+    cout << "[TEST] " << label << " : " << cmd << endl;
+    int status = system(cmd.c_str());
+    int code = decode_system_status(status, label);
+    return code;
+}
+
+// Helper: check if valgrind exists
+bool have_valgrind()
+{
+    return system("which valgrind > /dev/null 2>&1") == 0;
+}
+
+// Helper: run bug tests
+void run_bug_tests(const string &lang, const string &exename, const string &scriptname)
+{
+    cout << "\n=== BUG/ROBUSTNESS TESTS ===\n";
+    vector<string> tests;
+    vector<string> labels;
+    int fails = 0, total = 0;
+
+    bool is_compiled = (lang == "C" || lang == "CPP" || lang == "C++" || lang == "RUST" ||
+    lang == "ASM" || lang == "FORTRAN" || lang == "D" || lang == "DLANG");
+    bool is_script = (lang == "PYTHON" || lang == "PY" || lang == "R");
+
+    string run_cmd;
+    if (is_compiled) run_cmd = "./" + exename;
+    else if (lang == "JAVA") run_cmd = "java " + strip_extension(scriptname);
+    else if (lang == "PYTHON" || lang == "PY") run_cmd = "python3 " + scriptname;
+    else if (lang == "R") run_cmd = "Rscript " + scriptname;
+    else run_cmd = "";
+
+    // Test the argument handling - Robi
+    tests.push_back(run_cmd + " asd asd ads adsa");
+    labels.push_back("Argument Handling");
+
+    // 2. random small /dev/urandom data dump test
+    tests.push_back("head -c 1024 /dev/urandom | " + run_cmd);
+    labels.push_back("Random Input 1KB");
+
+    // 3. if it handled the smaller data test, let's try the bigger data serts
+    tests.push_back("head -c 65536 /dev/urandom | " + run_cmd);
+    labels.push_back("Stress Input 64KB");
+
+    // 4. Sample file test (if file 'sample.in' exists)
+    if (file_exists("sample.in"))
+    {
+        tests.push_back(run_cmd + " < sample.in");
+        labels.push_back("Sample Input File");
+    }
+
+    // 5. Valgrind test
+    if (is_compiled && have_valgrind())
+    {
+        tests.push_back("valgrind --leak-check=full " + run_cmd + " < /dev/null");
+        labels.push_back("Valgrind Leak Check");
+    }
+
+    // Run all tests
+    for (size_t i = 0; i < tests.size(); ++i)
+    {
+        ++total;
+        int code = run_and_report(tests[i], labels[i]);
+        if (code == 0)
+            cout << "[PASS] " << labels[i] << "\n";
+        else
+        {
+            cout << "[FAIL] " << labels[i] << " (code " << code << ")\n";
+            ++fails;
+        }
+    }
+    cout << "=== BUG TEST SUMMARY: Passed ===" << (total-fails) << "/" << total << " ===\n\n";
+}
+// If the user has fun, why not automate the cleaning process?
+void cleanup_file(const string &fname)
+{
+    if (remove(fname.c_str()) == 0)
+        cout << "[CLEANUP] Deleted: " << fname << endl;
+    else
+        cout << "[CLEANUP] File not found (skipped): " << fname << endl;
+}
+//Java:
+void cleanup_java_classes(const string &base)
+{
+    cout << "[CLEANUP] Deleting Java .class files..." << endl;
+    // remove all .class files in current directory
+    int code = system("rm -f *.class");
+    if (code == 0)
+        cout << "[CLEANUP] All .class files removed." << endl;
+    else
+        cout << "[CLEANUP] rm returned code " << code << endl;
+}
+//Prompt user:
+bool prompt_cleanup(const string &desc)
+{
+    cout << "[CLEANUP] " << desc << " Proceed? [y/N]: ";
+    string resp;
+    getline(cin, resp);
+    return !resp.empty() && (resp[0] == 'y' || resp[0] == 'Y');
+}
+
 
 
 int main(int argc, char* argv[])
@@ -453,9 +605,22 @@ int main(int argc, char* argv[])
         print_usage();
         return 0;
     }
-
     string first = argv[1];
     string U = to_upper(first);
+    if (U == "-RV") {
+        show_runner_versions();
+        return 0;
+    }
+    bool cleanupFlag = false;
+    bool promptCleanupFlag = false;
+    bool compileFlag = false;
+    bool runFlag = false;
+    bool bugFlag = false;
+    short tnum = 0; // default template 0
+    bool tnum_specified = false;
+    string filename_override = ""; // -f
+    string out_override = "";      // -o
+
 
     if (U == "-H" || U == "--HELP") { print_usage(); return 0; }
     if (U == "-S" || U == "--SUPPORTED") {
@@ -468,18 +633,12 @@ int main(int argc, char* argv[])
         return 0;
     }
 
-    // parse flags
-    bool compileFlag = false;
-    bool runFlag = false;
-    short tnum = 0; // default template 0
-    bool tnum_specified = false;
-    string filename_override = ""; // -f
-    string out_override = "";      // -o
-
+    // Parse flags, robustly and case-insensitive
     for (int i = 2; i < argc; ++i)
     {
         string a = argv[i];
         string A = to_upper(a);
+
         if (A == "-C" || A == "--COMPILE") compileFlag = true;
         else if (A == "-R" || A == "--RUN") { runFlag = true; compileFlag = true; }
         else if (A == "-T" || A == "--TEMPLATE") {
@@ -490,22 +649,28 @@ int main(int argc, char* argv[])
                 cerr << "Missing template number after -t\n";
                 return 1;
             }
-        } else if (A == "-F" || A == "--FILE" || A == "-f" ) {
+        } else if (A == "-F" || A == "--FILE") {
             if (i+1 < argc) {
                 filename_override = argv[++i];
             } else {
                 cerr << "Missing filename after -f\n";
                 return 1;
             }
-        } else if (A == "-O" || A == "--OUTPUT" || A == "-o") {
+        } else if (A == "-O" || A == "--OUTPUT") {
             if (i+1 < argc) {
                 out_override = argv[++i];
             } else {
                 cerr << "Missing output name after -o\n";
                 return 1;
             }
-        } else if (A == "-H" || A == "--HELP") { print_usage(); return 0; }
+        } else if (A == "-B" || A == "--BUG") bugFlag = true;
+        else if (A == "--CLEANUP" || A == "-X") cleanupFlag = true;
+        else if (A == "--PROMPT-CLEANUP") promptCleanupFlag = true;
+        else if (A == "-H" || A == "--HELP") { print_usage(); return 0; }
         else if (A == "-V" || A == "--VERSION") { cout << "t version 0.2\n"; return 0; }
+        else if (A == "-R" || A == "-C") { /* Already handled - ignore */ }
+        else if (A == "-F" || A == "-O") { /* Already handled - ignore */ }
+        else if (A == "-B" || A == "-X") { /* Already handled - ignore */ }
         else {
             cerr << "Unknown option: " << argv[i] << "\n";
             return 1;
@@ -527,11 +692,9 @@ int main(int argc, char* argv[])
 
     string chosen_fname = filename_override.empty() ? default_fname : filename_override;
 
-    // if file exists and user didn't give -c/-r -> auto-enable sensible behavior
-    bool file_exists = false;
-    if (FILE *f = fopen(chosen_fname.c_str(), "r")) { fclose(f); file_exists = true; }
+    bool file_exists_flag = file_exists(chosen_fname);
 
-    if (file_exists && !compileFlag && !runFlag) {
+    if (file_exists_flag && !compileFlag && !runFlag) {
         if (U == "C" || U == "CPP" || U == "C++" || U == "JAVA" || U == "RUST" || U == "ASM" || U == "FORTRAN" || U == "D" || U == "DLANG") {
             compileFlag = true;
             runFlag = true;
@@ -619,6 +782,49 @@ int main(int argc, char* argv[])
 
     prog->compile();
     prog->run();
+
+    // --- BUG MODE ---
+    if (bugFlag)
+    {
+        string outname = chosen_fname;
+        if (U == "C" || U == "CPP" || U == "C++" || U == "RUST" ||
+            U == "ASM" || U == "FORTRAN" || U == "D" || U == "DLANG")
+        {
+            // guess output binary name
+            if (!out_override.empty()) outname = out_override;
+            else outname = strip_extension(chosen_fname);
+            if (outname.empty()) outname = "a.out";
+        }
+        run_bug_tests(U, outname, chosen_fname);
+    }
+
+    // --- CLEANUP MODE ---
+    if (cleanupFlag)
+    {
+        bool do_cleanup = true;
+        if (promptCleanupFlag)
+            do_cleanup = prompt_cleanup("Cleanup generated files?");
+
+        if (do_cleanup)
+        {
+            if (U == "C" || U == "CPP" || U == "C++" || U == "RUST" ||
+                U == "ASM" || U == "FORTRAN" || U == "D" || U == "DLANG")
+            {
+                string outname = out_override.empty() ? strip_extension(chosen_fname) : out_override;
+                if (outname.empty()) outname = "a.out";
+                cleanup_file(outname);
+            }
+            else if (U == "JAVA")
+            {
+                cleanup_java_classes(strip_extension(chosen_fname));
+            }
+            // else: interpreted languages don't have output files to remove
+        }
+        else
+        {
+            cout << "[CLEANUP] Skipped by user.\n";
+        }
+    }
 
     delete prog;
     return 0;
