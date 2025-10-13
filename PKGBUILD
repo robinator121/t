@@ -1,4 +1,4 @@
-# Maintainer: Robi <youremail@example.com>
+# Maintainer: Robi
 pkgname=t
 pkgver=0.0.1
 pkgrel=1
@@ -6,7 +6,6 @@ pkgdesc="t — multi-language template generator and quick-compiler"
 arch=('x86_64')
 url="https://github.com/robinator121/t"
 license=('GPL3')
-# Basic runtime deps; add/remove compilers you want available on users' systems
 depends=('gcc' 'java-runtime' 'python' 'r' 'ldc')
 makedepends=('git')
 source=("git+https://github.com/robinator121/t.git")
